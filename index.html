@@ -532,14 +532,27 @@ audio.addEventListener('loadeddata', applyPendingSeek);
 audio.addEventListener('canplay', applyPendingSeek);
 
 // ---------- playback ----------
+// doPlay/doPause are explicit, non-toggling actions — the lock screen and
+// headset buttons call these directly. If they went through a toggle instead,
+// any drift between the OS's idea of the state and ours (very possible after
+// the page was backgrounded/suspended) could make a lock-screen "play" tap
+// actually call pause, so the tap looks like it does nothing.
+function doPlay(){
+  if (!current) return;
+  applyPendingSeek();
+  const attempt = () => audio.play().catch((e) => {
+    // one silent retry — iOS sometimes rejects the first resume right after
+    // the page wakes from a background suspend, then succeeds immediately after
+    setTimeout(() => audio.play().catch((e2) => toast('Oynatılamadı: ' + e2.message)), 250);
+  });
+  attempt();
+}
+function doPause(){
+  audio.pause();
+}
 function togglePlay(){
   if (!current) return;
-  if (audio.paused){
-    applyPendingSeek();
-    audio.play().then(() => { applyPendingSeek(); }).catch((e) => toast('Oynatılamadı: ' + e.message));
-  } else {
-    audio.pause();
-  }
+  if (audio.paused) doPlay(); else doPause();
 }
 function skip(sec){
   if (!current || !isFinite(audio.duration)) return;
@@ -597,7 +610,25 @@ function savePosition(force){
   persist(current);
 }
 ['pagehide', 'freeze'].forEach((ev) => window.addEventListener(ev, () => savePosition(true)));
-document.addEventListener('visibilitychange', () => { if (document.hidden) savePosition(true); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden){ savePosition(true); return; }
+  // coming back to the foreground (unlocked, switched back, or the page was
+  // suspended by iOS while backgrounded) — re-sync the lock screen controls
+  // so a stale playbackState can't make "play" silently act like "pause"
+  if (current){
+    setMediaMeta();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+    updateSeek();
+    updatePositionState();
+  }
+});
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted && current){
+    setMediaMeta();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+    updateSeek();
+  }
+});
 
 // ---------- Media Session (lock screen) ----------
 function setMediaMeta(){
@@ -609,8 +640,8 @@ function setMediaMeta(){
     title: current.title, artist: current.author || 'Sesli Kitap', album: 'Sesli Kitap', artwork: art
   });
   const h = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
-  try { h('play', () => togglePlay()); } catch(e){}
-  try { h('pause', () => togglePlay()); } catch(e){}
+  try { h('play', doPlay); } catch(e){}
+  try { h('pause', doPause); } catch(e){}
   try { h('seekbackward', (d) => skip(-(d.seekOffset || settings.skipBack))); } catch(e){}
   try { h('seekforward', (d) => skip(d.seekOffset || settings.skipFwd)); } catch(e){}
   try { h('seekto', (d) => { if (d.seekTime != null) { audio.currentTime = d.seekTime; updateSeek(); } }); } catch(e){}

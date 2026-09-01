@@ -1,5 +1,5 @@
 /* Sesli Kitap - service worker (app shell offline cache) */
-const CACHE = 'sesli-kitap-v1';
+const CACHE = 'sesli-kitap-v2';
 const ASSETS = [
   './',
   './index.html',
