@@ -63,6 +63,13 @@ uygulaması). Dosya büyükse `--audio-quality 5` ekleyerek küçültebilirsin.
 - Sağ üstteki ✎ ile kitabın adını/kapağını değiştir veya kitabı sil.
 - ⚙️ (Kitaplık ekranı) → sarma süreleri ve otomatik geri sarma ayarları.
 
+> **Kilit ekranı sınırı:** Telefon kilitliyken kilit ekranından duraklatıp yine
+> kilit ekranından devam ettirmek çalışmayabilir ("oynatılamıyor" / widget
+> kayboluyor) — bu iOS'un web sayfalarına koyduğu, kod tarafında aşılamayan bir
+> kısıtlama (native uygulamalar özel arka plan izniyle bunu aşabiliyor, web
+> sayfaları alamıyor). Duraklattıysan **kilidi aç, uygulamadan oynat'a bas** —
+> bu her zaman çalışıyor ve kaldığın yerden devam ediyor.
+
 ## Güncelleme
 
 `index.html` veya `sw.js` değişirse, dosyaları repoya tekrar yükle. Uygulama
