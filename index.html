@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>Sesli Kitap</title>
+<meta name="theme-color" content="#17130f" />
+<meta name="description" content="Kişisel sesli kitap dinleyici" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Sesli Kitap" />
+<style>
+  :root{
+    --bg:#17130f; --bg2:#211a14; --card:#2a211a; --card2:#332720;
+    --text:#f4ece3; --muted:#b3a493; --line:#3d2f24;
+    --accent:#e8944a; --accent2:#c96a34; --danger:#e06c5a;
+    --radius:16px;
+    --safe-t:env(safe-area-inset-top); --safe-b:env(safe-area-inset-bottom);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    overscroll-behavior-y:none; -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit;}
+  input,textarea{font-family:inherit;}
+  .app{max-width:640px; margin:0 auto; min-height:100%; position:relative;}
+
+  /* ---------- Library ---------- */
+  .screen{display:none; flex-direction:column; min-height:100vh; min-height:100dvh;}
+  .screen.active{display:flex;}
+  header.bar{
+    position:sticky; top:0; z-index:20; background:linear-gradient(var(--bg),var(--bg) 70%,transparent);
+    padding:calc(var(--safe-t) + 14px) 18px 10px; display:flex; align-items:center; gap:12px;
+  }
+  header.bar h1{font-size:22px; margin:0; letter-spacing:.2px; flex:1;}
+  .icon-btn{
+    width:40px; height:40px; border-radius:12px; background:var(--card);
+    display:flex; align-items:center; justify-content:center; font-size:18px; flex:none;
+  }
+  .icon-btn:active{background:var(--card2);}
+  .content{flex:1; padding:4px 16px calc(var(--safe-b) + 120px);}
+
+  .empty{
+    text-align:center; color:var(--muted); padding:64px 24px; line-height:1.6;
+  }
+  .empty .big{font-size:40px; margin-bottom:14px;}
+
+  .book{
+    display:flex; gap:14px; padding:12px; margin-bottom:10px;
+    background:var(--card); border-radius:var(--radius); align-items:center;
+  }
+  .book:active{background:var(--card2);}
+  .cover{
+    width:64px; height:64px; border-radius:12px; flex:none; object-fit:cover;
+    display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:700;
+    color:#fff; background-size:cover; background-position:center;
+  }
+  .book .meta{flex:1; min-width:0;}
+  .book .title{font-size:16px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .book .sub{font-size:13px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .pbar{height:5px; border-radius:3px; background:var(--line); margin-top:9px; overflow:hidden;}
+  .pbar > i{display:block; height:100%; background:var(--accent); border-radius:3px;}
+  .book .pct{font-size:12px; color:var(--muted); margin-top:5px;}
+
+  .add-btn{
+    position:fixed; left:50%; transform:translateX(-50%);
+    bottom:calc(var(--safe-b) + 20px); z-index:30;
+    background:var(--accent); color:#231206; font-weight:700; font-size:16px;
+    padding:15px 26px; border-radius:999px; box-shadow:0 8px 24px rgba(0,0,0,.4);
+    display:flex; align-items:center; gap:8px;
+  }
+  .add-btn:active{background:var(--accent2);}
+
+  /* ---------- Player ---------- */
+  #player .content{padding:0 22px calc(var(--safe-b) + 24px); display:flex; flex-direction:column;}
+  .pl-cover{
+    width:min(72vw,300px); aspect-ratio:1; border-radius:22px; margin:8px auto 22px;
+    background-size:cover; background-position:center; box-shadow:0 16px 40px rgba(0,0,0,.45);
+    display:flex; align-items:center; justify-content:center; font-size:80px; font-weight:800; color:#fff;
+  }
+  .pl-title{font-size:21px; font-weight:700; text-align:center; line-height:1.3;}
+  .pl-author{font-size:14px; color:var(--muted); text-align:center; margin-top:4px;}
+
+  .scrub{margin:22px 0 4px;}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:26px; background:transparent;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:6px; border-radius:3px;
+    background:linear-gradient(var(--accent),var(--accent)) 0/var(--fill,0%) 100% no-repeat, var(--line);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:20px; height:20px; border-radius:50%;
+    background:var(--accent); margin-top:-7px; box-shadow:0 2px 6px rgba(0,0,0,.4);
+  }
+  .times{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums;}
+
+  .controls{display:flex; align-items:center; justify-content:center; gap:22px; margin:20px 0 6px;}
+  .skip{
+    width:60px; height:60px; border-radius:50%; background:var(--card);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  }
+  .skip:active{background:var(--card2);}
+  .skip svg{width:24px; height:24px;}
+  .skip span{font-size:10px; color:var(--muted); font-weight:700;}
+  .playpause{
+    width:82px; height:82px; border-radius:50%; background:var(--accent); color:#231206;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .playpause:active{background:var(--accent2);}
+  .playpause svg{width:36px; height:36px;}
+
+  .row{display:flex; gap:10px; margin-top:18px;}
+  .chip{
+    flex:1; background:var(--card); border-radius:12px; padding:12px 8px; text-align:center;
+    font-size:13px; font-weight:600;
+  }
+  .chip:active{background:var(--card2);}
+  .chip small{display:block; color:var(--muted); font-weight:500; font-size:11px; margin-top:2px;}
+  .chip.on{background:var(--accent2); color:#fff;}
+
+  .bm-head{display:flex; align-items:center; justify-content:space-between; margin:26px 0 10px;}
+  .bm-head h3{margin:0; font-size:15px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px;}
+  .bm{
+    display:flex; align-items:center; gap:12px; padding:12px; background:var(--card);
+    border-radius:12px; margin-bottom:8px;
+  }
+  .bm:active{background:var(--card2);}
+  .bm .t{font-variant-numeric:tabular-nums; color:var(--accent); font-weight:700; font-size:13px; flex:none;}
+  .bm .n{flex:1; min-width:0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text);}
+  .bm .n.empty{color:var(--muted); font-style:italic;}
+  .bm .del{color:var(--muted); font-size:16px; padding:4px 6px; flex:none;}
+
+  /* ---------- Sheets / modals ---------- */
+  .backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; display:none;
+    align-items:flex-end; justify-content:center;
+  }
+  .backdrop.active{display:flex;}
+  .sheet{
+    width:100%; max-width:640px; background:var(--bg2); border-radius:22px 22px 0 0;
+    padding:20px 20px calc(var(--safe-b) + 20px); animation:up .22s ease;
+  }
+  @keyframes up{from{transform:translateY(40px); opacity:.4;} to{transform:none; opacity:1;}}
+  .sheet h2{margin:0 0 4px; font-size:19px;}
+  .sheet p.hint{margin:0 0 16px; color:var(--muted); font-size:13px; line-height:1.5;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px;}
+  .field input[type=text], .field textarea{
+    width:100%; background:var(--card); border:1px solid var(--line); color:var(--text);
+    border-radius:12px; padding:12px 14px; font-size:16px; outline:none;
+  }
+  .field input:focus, .field textarea:focus{border-color:var(--accent);}
+  .filepick{
+    display:flex; align-items:center; gap:12px; background:var(--card); border:1px dashed var(--line);
+    border-radius:12px; padding:14px; font-size:14px; color:var(--muted);
+  }
+  .filepick.ok{color:var(--text); border-style:solid; border-color:var(--accent);}
+  .filepick input{display:none;}
+  .sheet-actions{display:flex; gap:10px; margin-top:8px;}
+  .btn{
+    flex:1; padding:14px; border-radius:12px; font-size:16px; font-weight:700; text-align:center;
+  }
+  .btn.primary{background:var(--accent); color:#231206;}
+  .btn.primary:disabled{opacity:.4;}
+  .btn.ghost{background:var(--card); color:var(--text);}
+  .btn.danger{background:transparent; color:var(--danger); border:1px solid var(--danger);}
+  .opts{display:flex; flex-wrap:wrap; gap:8px;}
+  .opts button{
+    padding:10px 14px; border-radius:999px; background:var(--card); font-size:14px; font-weight:600;
+  }
+  .opts button.sel{background:var(--accent); color:#231206;}
+
+  .toast{
+    position:fixed; left:50%; bottom:calc(var(--safe-b) + 92px); transform:translateX(-50%);
+    background:#000; color:#fff; padding:10px 18px; border-radius:999px; font-size:13px; z-index:200;
+    opacity:0; transition:opacity .2s; pointer-events:none; max-width:90%;
+  }
+  .toast.show{opacity:.94;}
+  .spin{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block;vertical-align:-3px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== LIBRARY ===== -->
+  <section id="library" class="screen active">
+    <header class="bar">
+      <h1>Kitaplığım</h1>
+      <button class="icon-btn" id="settingsBtn" aria-label="Ayarlar">⚙️</button>
+    </header>
+    <div class="content" id="bookList"></div>
+    <button class="add-btn" id="addBtn">＋ Kitap Ekle</button>
+  </section>
+
+  <!-- ===== PLAYER ===== -->
+  <section id="player" class="screen">
+    <header class="bar">
+      <button class="icon-btn" id="backBtn" aria-label="Geri">‹</button>
+      <h1 style="font-size:16px; text-align:center;">Şimdi Çalıyor</h1>
+      <button class="icon-btn" id="editBtn" aria-label="Düzenle">✎</button>
+    </header>
+    <div class="content">
+      <div class="pl-cover" id="plCover"></div>
+      <div class="pl-title" id="plTitle"></div>
+      <div class="pl-author" id="plAuthor"></div>
+
+      <div class="scrub">
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" />
+        <div class="times"><span id="curTime">0:00</span><span id="remTime">-0:00</span></div>
+      </div>
+
+      <div class="controls">
+        <button class="skip" id="backSkip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+          <span id="backSkipLbl">15</span>
+        </button>
+        <button class="playpause" id="playBtn" aria-label="Oynat/Duraklat">
+          <svg id="iconPlay" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="iconPause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+        <button class="skip" id="fwdSkip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>
+          <span id="fwdSkipLbl">30</span>
+        </button>
+      </div>
+
+      <div class="row">
+        <button class="chip" id="speedChip">Hız <small id="speedLbl">1.0×</small></button>
+        <button class="chip" id="sleepChip">Uyku sayacı <small id="sleepLbl">Kapalı</small></button>
+      </div>
+
+      <div class="bm-head">
+        <h3>İşaretler</h3>
+        <button class="icon-btn" id="addBmBtn" aria-label="İşaret ekle" style="width:34px;height:34px;font-size:20px;">＋</button>
+      </div>
+      <div id="bmList"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ===== ADD / EDIT SHEET ===== -->
+<div class="backdrop" id="addBackdrop">
+  <div class="sheet">
+    <h2 id="addSheetTitle">Kitap Ekle</h2>
+    <p class="hint" id="addSheetHint">Telefonundaki bir MP3 / M4A ses dosyasını seç. Dosya uygulamanın içine kaydedilir, çevrimdışı da çalışır.</p>
+    <div class="field" id="fileField">
+      <label>Ses dosyası</label>
+      <label class="filepick" id="filePick">
+        <span id="fileIcon">🎧</span>
+        <span id="fileName">Dosya seç…</span>
+        <input type="file" id="audioFile" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav,.opus" />
+      </label>
+    </div>
+    <div class="field">
+      <label>Kitap adı</label>
+      <input type="text" id="titleInput" placeholder="Örn: Suç ve Ceza" />
+    </div>
+    <div class="field">
+      <label>Yazar / okuyan (isteğe bağlı)</label>
+      <input type="text" id="authorInput" placeholder="Örn: Dostoyevski" />
+    </div>
+    <div class="field">
+      <label>Kapak görseli (isteğe bağlı)</label>
+      <label class="filepick" id="coverPick">
+        <span>🖼️</span>
+        <span id="coverName">Görsel seç…</span>
+        <input type="file" id="coverFile" accept="image/*" />
+      </label>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="addCancel">Vazgeç</button>
+      <button class="btn primary" id="addSave" disabled>Kaydet</button>
+    </div>
+    <div class="sheet-actions" id="deleteRow" style="display:none;">
+      <button class="btn danger" id="deleteBook">Bu kitabı sil</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BOOKMARK SHEET ===== -->
+<div class="backdrop" id="bmBackdrop">
+  <div class="sheet">
+    <h2 id="bmSheetTitle">İşaret ekle</h2>
+    <p class="hint" id="bmTimeHint"></p>
+    <div class="field">
+      <label>Not</label>
+      <textarea id="bmNote" rows="3" placeholder="Örn: Bu bölüme geri dön, alıntı güzeldi"></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="bmCancel">Vazgeç</button>
+      <button class="btn primary" id="bmSave">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SPEED SHEET ===== -->
+<div class="backdrop" id="speedBackdrop">
+  <div class="sheet">
+    <h2>Oynatma hızı</h2>
+    <p class="hint">Sesli kitaplar için 1.25×–1.5× çoğu kişiye rahat gelir.</p>
+    <div class="opts" id="speedOpts"></div>
+    <div class="sheet-actions"><button class="btn ghost" id="speedClose">Kapat</button></div>
+  </div>
+</div>
+
+<!-- ===== SLEEP SHEET ===== -->
+<div class="backdrop" id="sleepBackdrop">
+  <div class="sheet">
+    <h2>Uyku sayacı</h2>
+    <p class="hint">Seçilen süre sonunda çalma duraklar. Kaldığın yer kaydedilir.</p>
+    <div class="opts" id="sleepOpts"></div>
+    <div class="sheet-actions"><button class="btn ghost" id="sleepClose">Kapat</button></div>
+  </div>
+</div>
+
+<!-- ===== SETTINGS SHEET ===== -->
+<div class="backdrop" id="setBackdrop">
+  <div class="sheet">
+    <h2>Ayarlar</h2>
+    <div class="field">
+      <label>Geri sarma süresi (saniye)</label>
+      <div class="opts" id="backOpts"></div>
+    </div>
+    <div class="field">
+      <label>İleri sarma süresi (saniye)</label>
+      <div class="opts" id="fwdOpts"></div>
+    </div>
+    <div class="field">
+      <label>Devam ederken otomatik geri sar</label>
+      <div class="opts" id="rewOpts"></div>
+    </div>
+    <p class="hint" id="storageInfo">Depolama hesaplanıyor…</p>
+    <div class="sheet-actions"><button class="btn ghost" id="setClose">Kapat</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------- constants / settings ----------
+const DB_NAME = 'sesli-kitap', DB_VERSION = 1;
+const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
+const SLEEP_OPTS = [0, 5, 10, 15, 30, 45, 60];
+const SKIP_OPTS = [10, 15, 20, 30, 45, 60];
+const REW_OPTS = [0, 3, 5, 10, 15, 30];
+const COVER_COLORS = ['#c96a34','#7a8450','#5a7d8c','#8c5a7d','#8c7a5a','#6a6ac9','#4f8c6b','#b5472e'];
+
+const settings = Object.assign(
+  { skipBack: 15, skipFwd: 30, rewindOnResume: 5 },
+  JSON.parse(localStorage.getItem('sk-settings') || '{}')
+);
+const saveSettings = () => localStorage.setItem('sk-settings', JSON.stringify(settings));
+
+// ---------- tiny helpers ----------
+const $ = (s) => document.querySelector(s);
+const el = (s) => document.getElementById(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+function fmt(t){
+  t = Math.max(0, Math.floor(t || 0));
+  const h = Math.floor(t/3600), m = Math.floor(t%3600/60), s = t%60;
+  return h ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
+}
+function human(t){
+  t = Math.max(0, Math.round(t || 0));
+  if (t < 60) return `${t} sn`;
+  const h = Math.floor(t/3600), m = Math.round(t%3600/60);
+  if (h) return `${h} sa ${m} dk`;
+  return `${m} dk`;
+}
+let toastTimer;
+function toast(msg){
+  const t = el('toast'); t.innerHTML = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function colorFor(id){
+  let h = 0; for (const c of id) h = (h*31 + c.charCodeAt(0)) >>> 0;
+  return COVER_COLORS[h % COVER_COLORS.length];
+}
+const initials = (s) => (s || '?').trim().slice(0,1).toUpperCase();
+
+// ---------- IndexedDB ----------
+let _db;
+function db(){
+  if (_db) return Promise.resolve(_db);
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, DB_VERSION);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      if (!d.objectStoreNames.contains('books')) d.createObjectStore('books', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('audio')) d.createObjectStore('audio', { keyPath: 'id' });
+    };
+    r.onsuccess = () => { _db = r.result; res(_db); };
+    r.onerror = () => rej(r.error);
+  });
+}
+function idb(store, mode, fn){
+  return db().then((d) => new Promise((res, rej) => {
+    const tx = d.transaction(store, mode);
+    const os = tx.objectStore(store);
+    let out;
+    Promise.resolve(fn(os, (v) => { out = v; })).catch(rej);
+    tx.oncomplete = () => res(out);
+    tx.onerror = () => rej(tx.error);
+    tx.onabort = () => rej(tx.error || new Error('tx abort'));
+  }));
+}
+const dbGetAll = (s) => idb(s, 'readonly', (os, ret) => { os.getAll().onsuccess = (e) => ret(e.target.result); });
+const dbGet = (s, k) => idb(s, 'readonly', (os, ret) => { os.get(k).onsuccess = (e) => ret(e.target.result); });
+const dbPut = (s, v) => idb(s, 'readwrite', (os) => os.put(v));
+const dbDel = (s, k) => idb(s, 'readwrite', (os) => os.delete(k));
+
+// ---------- state ----------
+let books = [];
+let current = null;            // current book record
+let audio = new Audio();
+audio.preload = 'metadata';
+audio.setAttribute('playsinline', '');
+audio.hidden = true;
+document.body.appendChild(audio);
+let srcUrl = null;             // object URL for current audio
+let seeking = false;
+let saveTick = 0;
+let pendingSeek = null;
+let loadingBook = false;
+
+// ---------- library render ----------
+async function loadBooks(){
+  books = await dbGetAll('books');
+  books.sort((a, b) => (b.lastPlayedAt || b.addedAt || 0) - (a.lastPlayedAt || a.addedAt || 0));
+  renderLibrary();
+}
+function coverStyle(b){
+  if (b.cover) return `background-image:url('${b.cover}')`;
+  return `background:${colorFor(b.id)}`;
+}
+function renderLibrary(){
+  const wrap = el('bookList');
+  if (!books.length){
+    wrap.innerHTML = `<div class="empty"><div class="big">🎧</div>
+      Henüz kitap yok.<br>Aşağıdaki <b>＋ Kitap Ekle</b> ile telefonundaki bir ses dosyasını ekle.</div>`;
+    return;
+  }
+  wrap.innerHTML = books.map((b) => {
+    const dur = b.duration || 0;
+    const pos = Math.min(b.position || 0, dur || Infinity);
+    const pct = dur ? Math.round(pos / dur * 100) : 0;
+    const rem = dur ? `${human(dur - pos)} kaldı` : 'süre bilinmiyor';
+    const done = dur && pos >= dur - 2;
+    return `<div class="book" data-id="${b.id}">
+      <div class="cover" style="${coverStyle(b)}">${b.cover ? '' : initials(b.title)}</div>
+      <div class="meta">
+        <div class="title">${esc(b.title)}</div>
+        <div class="sub">${esc(b.author || '')}${b.author ? ' · ' : ''}${done ? 'Bitti ✓' : rem}</div>
+        <div class="pbar"><i style="width:${pct}%"></i></div>
+        <div class="pct">${pct}%${b.bookmarks && b.bookmarks.length ? ' · 🔖 ' + b.bookmarks.length : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('.book').forEach((n) => n.addEventListener('click', () => openBook(n.dataset.id)));
+}
+function esc(s){ return (s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---------- screen switch ----------
+function show(screen){
+  document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === screen));
+  window.scrollTo(0, 0);
+}
+
+// ---------- open / play a book ----------
+async function openBook(id){
+  const b = books.find((x) => x.id === id);
+  if (!b) return;
+  audio.pause();
+  loadingBook = true;          // block position saves until the new book is wired up
+  current = b;
+  show('player');
+  el('plTitle').textContent = b.title;
+  el('plAuthor').textContent = b.author || '';
+  el('plCover').style.cssText = coverStyle(b);
+  el('plCover').textContent = b.cover ? '' : initials(b.title);
+  el('speedLbl').textContent = (b.rate || 1).toFixed(2).replace(/0$/,'') + '×';
+  renderBookmarks();
+  setSleep(0, true);
+
+  // load audio blob
+  el('curTime').textContent = '…';
+  const rec = await dbGet('audio', id);
+  if (!rec || !rec.blob){ loadingBook = false; toast('Ses dosyası bulunamadı'); return; }
+  if (srcUrl) URL.revokeObjectURL(srcUrl);
+  srcUrl = URL.createObjectURL(rec.blob);
+  let start = b.position || 0;
+  if (start > 0 && settings.rewindOnResume) start = Math.max(0, start - settings.rewindOnResume);
+  pendingSeek = start;
+  loadingBook = false;
+  audio.src = srcUrl;
+  audio.playbackRate = b.rate || 1;
+  audio.load();
+  updateSeek();
+}
+
+// Restore saved position once the media can accept a seek. Fires from several
+// media events because browsers differ on when `currentTime` becomes settable.
+function applyPendingSeek(){
+  if (pendingSeek == null || !current) return;
+  const d = audio.duration;
+  if (!isFinite(d) || d <= 0) return;
+  const target = Math.max(0, Math.min(pendingSeek, d - 0.5));
+  try { audio.currentTime = target; } catch(e){ return; }
+  if (Math.abs(audio.currentTime - target) < 1.5) pendingSeek = null;
+  updateSeek();
+}
+audio.addEventListener('loadedmetadata', () => {
+  if (current && (!current.duration || Math.abs(current.duration - audio.duration) > 1)){
+    current.duration = audio.duration; persist(current);
+  }
+  applyPendingSeek();
+  setMediaMeta();
+});
+audio.addEventListener('loadeddata', applyPendingSeek);
+audio.addEventListener('canplay', applyPendingSeek);
+
+// ---------- playback ----------
+function togglePlay(){
+  if (!current) return;
+  if (audio.paused){
+    applyPendingSeek();
+    audio.play().then(() => { applyPendingSeek(); }).catch((e) => toast('Oynatılamadı: ' + e.message));
+  } else {
+    audio.pause();
+  }
+}
+function skip(sec){
+  if (!current || !isFinite(audio.duration)) return;
+  audio.currentTime = Math.max(0, Math.min(audio.duration - 0.3, audio.currentTime + sec));
+  updateSeek(); savePosition(true);
+}
+audio.addEventListener('play', () => { setIcon(true); if (navigator.mediaSession) navigator.mediaSession.playbackState = 'playing'; });
+audio.addEventListener('pause', () => { setIcon(false); savePosition(true); if (navigator.mediaSession) navigator.mediaSession.playbackState = 'paused'; });
+audio.addEventListener('ended', () => { setIcon(false); if (current){ current.position = current.duration || 0; persist(current); } });
+audio.addEventListener('timeupdate', () => {
+  if (!seeking) updateSeek();
+  if (Date.now() - saveTick > 4000) savePosition();
+  updatePositionState();
+});
+function setIcon(playing){
+  el('iconPlay').style.display = playing ? 'none' : 'block';
+  el('iconPause').style.display = playing ? 'block' : 'none';
+}
+function updateSeek(){
+  const d = audio.duration || current?.duration || 0;
+  const c = audio.currentTime || 0;
+  const pct = d ? c / d * 100 : 0;
+  const s = el('seek');
+  s.value = Math.round(pct * 10);
+  s.style.setProperty('--fill', pct + '%');
+  el('curTime').textContent = fmt(c);
+  el('remTime').textContent = '-' + fmt(Math.max(0, d - c));
+}
+el('seek').addEventListener('input', () => {
+  seeking = true;
+  const d = audio.duration || 0;
+  const c = d * (el('seek').value / 1000);
+  el('seek').style.setProperty('--fill', (el('seek').value / 10) + '%');
+  el('curTime').textContent = fmt(c);
+  el('remTime').textContent = '-' + fmt(Math.max(0, d - c));
+});
+el('seek').addEventListener('change', () => {
+  const d = audio.duration || 0;
+  if (d) audio.currentTime = d * (el('seek').value / 1000);
+  seeking = false; savePosition(true);
+});
+
+// ---------- position persistence ----------
+function persist(b){
+  b.updatedAt = Date.now();
+  return dbPut('books', b);
+}
+function savePosition(force){
+  if (!current || !isFinite(audio.currentTime)) return;
+  if (loadingBook || pendingSeek != null) return; // saved position not restored yet — don't clobber it
+  if (!force && Date.now() - saveTick < 4000) return;
+  saveTick = Date.now();
+  current.position = audio.currentTime;
+  current.lastPlayedAt = Date.now();
+  persist(current);
+}
+['pagehide', 'freeze'].forEach((ev) => window.addEventListener(ev, () => savePosition(true)));
+document.addEventListener('visibilitychange', () => { if (document.hidden) savePosition(true); });
+
+// ---------- Media Session (lock screen) ----------
+function setMediaMeta(){
+  if (!('mediaSession' in navigator) || !current) return;
+  const art = current.cover
+    ? [{ src: current.cover, sizes: '512x512', type: 'image/png' }]
+    : [{ src: './icon-512.png', sizes: '512x512', type: 'image/png' }];
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: current.title, artist: current.author || 'Sesli Kitap', album: 'Sesli Kitap', artwork: art
+  });
+  const h = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
+  try { h('play', () => togglePlay()); } catch(e){}
+  try { h('pause', () => togglePlay()); } catch(e){}
+  try { h('seekbackward', (d) => skip(-(d.seekOffset || settings.skipBack))); } catch(e){}
+  try { h('seekforward', (d) => skip(d.seekOffset || settings.skipFwd)); } catch(e){}
+  try { h('seekto', (d) => { if (d.seekTime != null) { audio.currentTime = d.seekTime; updateSeek(); } }); } catch(e){}
+  try { h('previoustrack', () => skip(-settings.skipBack)); } catch(e){}
+  try { h('nexttrack', () => skip(settings.skipFwd)); } catch(e){}
+}
+function updatePositionState(){
+  if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
+  const d = audio.duration;
+  if (!isFinite(d) || d <= 0) return;
+  try {
+    navigator.mediaSession.setPositionState({
+      duration: d, playbackRate: audio.playbackRate || 1,
+      position: Math.min(audio.currentTime, d)
+    });
+  } catch(e){}
+}
+
+// ---------- bookmarks ----------
+function renderBookmarks(){
+  const wrap = el('bmList');
+  const list = (current.bookmarks || []).slice().sort((a, b) => a.time - b.time);
+  if (!list.length){
+    wrap.innerHTML = `<div class="empty" style="padding:24px 8px;font-size:13px;">Henüz işaret yok. Dinlerken ＋ ile o ana bir not bırak.</div>`;
+    return;
+  }
+  wrap.innerHTML = list.map((m) => `<div class="bm" data-id="${m.id}">
+      <span class="t">${fmt(m.time)}</span>
+      <span class="n ${m.note ? '' : 'empty'}">${m.note ? esc(m.note) : 'notsuz işaret'}</span>
+      <button class="del" data-del="${m.id}" aria-label="Sil">🗑</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.bm').forEach((n) => n.addEventListener('click', (e) => {
+    if (e.target.dataset.del) return;
+    const m = (current.bookmarks || []).find((x) => x.id === n.dataset.id);
+    if (m){ audio.currentTime = m.time; updateSeek(); if (audio.paused) togglePlay(); }
+  }));
+  wrap.querySelectorAll('[data-del]').forEach((btn) => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    current.bookmarks = (current.bookmarks || []).filter((x) => x.id !== btn.dataset.del);
+    persist(current); renderBookmarks();
+  }));
+}
+let bmPending = null;
+function openBookmarkSheet(){
+  if (!current) return;
+  bmPending = { id: uid(), time: audio.currentTime || 0, createdAt: Date.now(), note: '' };
+  el('bmTimeHint').textContent = 'Konum: ' + fmt(bmPending.time);
+  el('bmNote').value = '';
+  el('bmBackdrop').classList.add('active');
+  setTimeout(() => el('bmNote').focus(), 150);
+}
+el('bmSave').addEventListener('click', () => {
+  if (!bmPending) return;
+  bmPending.note = el('bmNote').value.trim();
+  current.bookmarks = current.bookmarks || [];
+  current.bookmarks.push(bmPending);
+  persist(current); renderBookmarks();
+  el('bmBackdrop').classList.remove('active');
+  toast('İşaret eklendi');
+  bmPending = null;
+});
+el('bmCancel').addEventListener('click', () => { el('bmBackdrop').classList.remove('active'); bmPending = null; });
+
+// ---------- add / edit book ----------
+let editing = null;      // book being edited, or null when adding
+let pendingAudioFile = null, pendingCoverDataUrl = null;
+
+function openAddSheet(book){
+  editing = book || null;
+  pendingAudioFile = null;
+  pendingCoverDataUrl = book ? (book.cover || null) : null;
+  el('addSheetTitle').textContent = book ? 'Kitabı düzenle' : 'Kitap Ekle';
+  el('fileField').style.display = book ? 'none' : 'block';
+  el('deleteRow').style.display = book ? 'flex' : 'none';
+  el('titleInput').value = book ? book.title : '';
+  el('authorInput').value = book ? (book.author || '') : '';
+  el('fileName').textContent = 'Dosya seç…';
+  el('filePick').classList.remove('ok');
+  el('coverName').textContent = pendingCoverDataUrl ? 'Görsel seçildi ✓' : 'Görsel seç…';
+  el('coverPick').classList.toggle('ok', !!pendingCoverDataUrl);
+  el('audioFile').value = ''; el('coverFile').value = '';
+  validateAdd();
+  el('addBackdrop').classList.add('active');
+}
+function closeAddSheet(){ el('addBackdrop').classList.remove('active'); }
+function validateAdd(){
+  const ok = el('titleInput').value.trim() && (editing || pendingAudioFile);
+  el('addSave').disabled = !ok;
+}
+el('titleInput').addEventListener('input', validateAdd);
+
+el('audioFile').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  pendingAudioFile = f;
+  el('fileName').textContent = f.name + ' · ' + (f.size/1048576).toFixed(1) + ' MB';
+  el('filePick').classList.add('ok');
+  if (!el('titleInput').value.trim())
+    el('titleInput').value = f.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+  validateAdd();
+});
+el('coverFile').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => shrinkCover(r.result);
+  r.readAsDataURL(f);
+});
+function shrinkCover(dataUrl){
+  const img = new Image();
+  img.onload = () => {
+    const S = 512;
+    const cv = document.createElement('canvas');
+    const scale = Math.min(S / img.width, S / img.height, 1);
+    cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    pendingCoverDataUrl = cv.toDataURL('image/jpeg', 0.82);
+    el('coverName').textContent = 'Görsel seçildi ✓';
+    el('coverPick').classList.add('ok');
+  };
+  img.onerror = () => toast('Görsel okunamadı');
+  img.src = dataUrl;
+}
+
+async function readDuration(file){
+  return new Promise((res) => {
+    const a = document.createElement('audio');
+    a.preload = 'metadata';
+    const u = URL.createObjectURL(file);
+    a.onloadedmetadata = () => { const d = a.duration; URL.revokeObjectURL(u); res(isFinite(d) ? d : 0); };
+    a.onerror = () => { URL.revokeObjectURL(u); res(0); };
+    a.src = u;
+  });
+}
+
+el('addSave').addEventListener('click', async () => {
+  const btn = el('addSave');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+  try {
+    const title = el('titleInput').value.trim();
+    const author = el('authorInput').value.trim();
+    if (editing){
+      editing.title = title; editing.author = author; editing.cover = pendingCoverDataUrl || null;
+      await persist(editing);
+      if (current && current.id === editing.id){
+        el('plTitle').textContent = title; el('plAuthor').textContent = author;
+        el('plCover').style.cssText = coverStyle(editing);
+        el('plCover').textContent = editing.cover ? '' : initials(title);
+        setMediaMeta();
+      }
+    } else {
+      const id = uid();
+      const dur = await readDuration(pendingAudioFile);
+      const book = {
+        id, title, author, cover: pendingCoverDataUrl || null,
+        fileName: pendingAudioFile.name, mime: pendingAudioFile.type || 'audio/mpeg',
+        size: pendingAudioFile.size, duration: dur, position: 0,
+        rate: 1, bookmarks: [], addedAt: Date.now(), lastPlayedAt: Date.now()
+      };
+      await dbPut('audio', { id, blob: pendingAudioFile });
+      await persist(book);
+      requestPersistentStorage();
+    }
+    closeAddSheet();
+    await loadBooks();
+    toast(editing ? 'Kaydedildi' : 'Kitap eklendi');
+  } catch (err){
+    toast('Hata: ' + (err && err.message || err));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Kaydet';
+  }
+});
+el('addCancel').addEventListener('click', closeAddSheet);
+el('deleteBook').addEventListener('click', async () => {
+  if (!editing) return;
+  if (!confirm(`"${editing.title}" silinsin mi? Ses dosyası ve işaretler kalıcı olarak silinir.`)) return;
+  await dbDel('audio', editing.id);
+  await dbDel('books', editing.id);
+  if (current && current.id === editing.id){ audio.pause(); audio.removeAttribute('src'); current = null; show('library'); }
+  closeAddSheet();
+  await loadBooks();
+  toast('Silindi');
+});
+
+// ---------- speed ----------
+function openSpeed(){
+  const wrap = el('speedOpts');
+  wrap.innerHTML = SPEEDS.map((s) => `<button data-s="${s}" class="${(current?.rate||1)===s?'sel':''}">${s}×</button>`).join('');
+  wrap.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    const s = parseFloat(b.dataset.s);
+    current.rate = s; audio.playbackRate = s;
+    el('speedLbl').textContent = s.toFixed(2).replace(/0$/,'') + '×';
+    persist(current); openSpeed();
+    updatePositionState();
+  }));
+  el('speedBackdrop').classList.add('active');
+}
+
+// ---------- sleep timer ----------
+let sleepEndsAt = 0, sleepInterval = 0;
+function setSleep(mins, silent){
+  clearInterval(sleepInterval); sleepInterval = 0;
+  if (!mins){
+    sleepEndsAt = 0;
+    el('sleepLbl').textContent = 'Kapalı';
+    el('sleepChip').classList.remove('on');
+    if (!silent) toast('Uyku sayacı kapalı');
+    return;
+  }
+  sleepEndsAt = Date.now() + mins * 60000;
+  el('sleepChip').classList.add('on');
+  const tick = () => {
+    const left = sleepEndsAt - Date.now();
+    if (left <= 0){
+      clearInterval(sleepInterval); sleepInterval = 0; sleepEndsAt = 0;
+      audio.pause();
+      el('sleepLbl').textContent = 'Kapalı';
+      el('sleepChip').classList.remove('on');
+      toast('Uyku sayacı: durduruldu');
+      return;
+    }
+    el('sleepLbl').textContent = fmt(left / 1000);
+  };
+  tick();
+  sleepInterval = setInterval(tick, 1000);
+  if (!silent) toast(mins + ' dk sonra duracak');
+}
+function openSleep(){
+  const wrap = el('sleepOpts');
+  const activeMin = sleepEndsAt ? Math.round((sleepEndsAt - Date.now())/60000) : 0;
+  wrap.innerHTML = SLEEP_OPTS.map((m) =>
+    `<button data-m="${m}" class="${(!m && !sleepEndsAt) ? 'sel' : ''}">${m ? m + ' dk' : 'Kapalı'}</button>`).join('');
+  wrap.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    setSleep(parseInt(b.dataset.m, 10));
+    el('sleepBackdrop').classList.remove('active');
+  }));
+  el('sleepBackdrop').classList.add('active');
+}
+
+// ---------- settings ----------
+function pill(list, cur, cb){
+  return list.map((v) => `<button data-v="${v}" class="${v===cur?'sel':''}">${v===0?'Kapalı':v}</button>`).join('');
+}
+function openSettings(){
+  const bind = (id, list, key) => {
+    el(id).innerHTML = pill(list, settings[key]);
+    el(id).querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      settings[key] = parseInt(b.dataset.v, 10); saveSettings();
+      openSettings(); applySettings();
+    }));
+  };
+  bind('backOpts', SKIP_OPTS, 'skipBack');
+  bind('fwdOpts', SKIP_OPTS, 'skipFwd');
+  bind('rewOpts', REW_OPTS, 'rewindOnResume');
+  el('setBackdrop').classList.add('active');
+  showStorage();
+}
+function applySettings(){
+  el('backSkipLbl').textContent = settings.skipBack;
+  el('fwdSkipLbl').textContent = settings.skipFwd;
+}
+async function showStorage(){
+  try {
+    const est = await navigator.storage.estimate();
+    const used = (est.usage/1048576).toFixed(0), quota = (est.quota/1048576).toFixed(0);
+    const persisted = navigator.storage.persisted ? await navigator.storage.persisted() : false;
+    el('storageInfo').innerHTML =
+      `Depolama: ${used} MB / ~${quota} MB kullanıldı.<br>` +
+      `Kalıcı depolama: ${persisted ? 'açık ✓' : 'kapalı (nadiren silinebilir)'}.`;
+  } catch(e){ el('storageInfo').textContent = 'Depolama bilgisi alınamıyor.'; }
+}
+async function requestPersistentStorage(){
+  try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch(e){}
+}
+
+// ---------- wire up buttons ----------
+el('addBtn').addEventListener('click', () => openAddSheet(null));
+el('backBtn').addEventListener('click', () => { savePosition(true); show('library'); loadBooks(); });
+el('editBtn').addEventListener('click', () => current && openAddSheet(current));
+el('playBtn').addEventListener('click', togglePlay);
+el('backSkip').addEventListener('click', () => skip(-settings.skipBack));
+el('fwdSkip').addEventListener('click', () => skip(settings.skipFwd));
+el('addBmBtn').addEventListener('click', openBookmarkSheet);
+el('speedChip').addEventListener('click', openSpeed);
+el('speedClose').addEventListener('click', () => el('speedBackdrop').classList.remove('active'));
+el('sleepChip').addEventListener('click', openSleep);
+el('sleepClose').addEventListener('click', () => el('sleepBackdrop').classList.remove('active'));
+el('settingsBtn').addEventListener('click', openSettings);
+el('setClose').addEventListener('click', () => el('setBackdrop').classList.remove('active'));
+document.querySelectorAll('.backdrop').forEach((bd) => bd.addEventListener('click', (e) => {
+  if (e.target === bd) bd.classList.remove('active');
+}));
+
+// keyboard (desktop testing convenience)
+document.addEventListener('keydown', (e) => {
+  if (document.querySelector('.backdrop.active')) return;
+  if (el('player').classList.contains('active')){
+    if (e.code === 'Space'){ e.preventDefault(); togglePlay(); }
+    if (e.code === 'ArrowLeft') skip(-settings.skipBack);
+    if (e.code === 'ArrowRight') skip(settings.skipFwd);
+  }
+});
+
+// ---------- boot ----------
+applySettings();
+loadBooks();
+requestPersistentStorage();
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+})();
+</script>
+</body>
+</html>
