@@ -537,13 +537,33 @@ audio.addEventListener('canplay', applyPendingSeek);
 // any drift between the OS's idea of the state and ours (very possible after
 // the page was backgrounded/suspended) could make a lock-screen "play" tap
 // actually call pause, so the tap looks like it does nothing.
+// WebKit occasionally "resumes" a background-paused <audio> in a ghost state:
+// currentTime keeps ticking but no sound actually comes out, because the real
+// audio output route never re-attached. Briefly muting/unmuting and nudging
+// currentTime forces it to re-engage. Harmless when playback was already fine.
+function reattachAudioOutput(){
+  try {
+    audio.muted = true;
+    const t = audio.currentTime;
+    // NOTE: requestAnimationFrame is paused by the browser while the page is
+    // backgrounded/locked — exactly when this runs most often — so it would
+    // never fire and audio would stay muted forever. setTimeout keeps firing.
+    setTimeout(() => {
+      audio.muted = false;
+      if (isFinite(audio.duration)) audio.currentTime = Math.min(Math.max(0, t + 0.03), audio.duration - 0.1);
+    }, 30);
+  } catch (e){}
+}
 function doPlay(){
   if (!current) return;
   applyPendingSeek();
-  const attempt = () => audio.play().catch((e) => {
+  const attempt = () => audio.play().then(() => {
+    reattachAudioOutput();
+    setTimeout(reattachAudioOutput, 500); // some resumes only go silent a beat later
+  }).catch((e) => {
     // one silent retry — iOS sometimes rejects the first resume right after
     // the page wakes from a background suspend, then succeeds immediately after
-    setTimeout(() => audio.play().catch((e2) => toast('Oynatılamadı: ' + e2.message)), 250);
+    setTimeout(() => audio.play().then(reattachAudioOutput).catch((e2) => toast('Oynatılamadı: ' + e2.message)), 250);
   });
   attempt();
 }
@@ -620,6 +640,7 @@ document.addEventListener('visibilitychange', () => {
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
     updateSeek();
     updatePositionState();
+    if (!audio.paused) reattachAudioOutput(); // guard against silent "ghost" playback
   }
 });
 window.addEventListener('pageshow', (e) => {
@@ -627,6 +648,7 @@ window.addEventListener('pageshow', (e) => {
     setMediaMeta();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
     updateSeek();
+    if (!audio.paused) reattachAudioOutput();
   }
 });
 
